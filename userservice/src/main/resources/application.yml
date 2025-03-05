@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: userservice
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/security?useSSL=false&useUnicode=true&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+    username: root
+    password: 1234
+
+  jpa:
+    hibernate:
+      #      ddl-auto: update
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+
+jwt:
+  secret-key: yourVerySecretKeyHereItShouldBeAtLeast32CharactersLong
+  access-token-validity-in-ms: 3600000
+  refresh-token-validity-in-ms: 2592000000
+  token-prefix: Bearer
+  header-string: Authorization
+
