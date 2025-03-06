@@ -5,6 +5,7 @@ import com.c202.userservice.domain.user.model.request.LoginRequestDto;
 import com.c202.userservice.domain.user.model.request.SignupRequestDto;
 import com.c202.userservice.domain.user.model.response.UserResponseDto;
 import com.c202.userservice.domain.user.repository.UserRepository;
+import com.c202.userservice.global.auth.CustomUserDetails;
 import com.c202.userservice.global.auth.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,13 +36,13 @@ public class UserService {
         User user = User.builder()
                 .username(request.getUsername())
                 // 나중에
-//                .password(passwordEncoder.encode(request.getPassword()))
-                .password(request.getPassword())
+                .password(passwordEncoder.encode(request.getPassword()))
+//                .password(request.getPassword())
                 .nickname(request.getNickname())
                 .birthDate(request.getBirthDate())
                 .birthTime(request.getBirthTime())
-                .pwQuestion(request.getPwQuestion())
-                .pwAnswer(request.getPwAnswer())
+//                .pwQuestion(request.getPwQuestion())
+//                .pwAnswer(request.getPwAnswer())
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -50,11 +51,16 @@ public class UserService {
     }
 
     public String login(LoginRequestDto request) {
+        // Spring Security 인증 처리
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
 
-        return jwtTokenProvider.createToken(request.getUsername());
+        // 인증된 사용자 정보 가져오기
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+
+        // 토큰 생성 및 반환
+        return jwtTokenProvider.createToken(userDetails.getUsername(), userDetails.getId());
     }
 
     public boolean isUsernameAvailable(String username) {

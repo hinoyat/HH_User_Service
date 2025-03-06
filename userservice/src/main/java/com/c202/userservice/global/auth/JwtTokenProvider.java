@@ -4,6 +4,7 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -17,6 +18,7 @@ import java.util.Base64;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JwtTokenProvider {
 
     @Value("${jwt.secret-key}")
@@ -34,8 +36,9 @@ public class JwtTokenProvider {
         key = Keys.hmacShaKeyFor(encodedKey.getBytes());
     }
 
-    public String createToken(String username) {
+    public String createToken(String username, Long userId) {
         Claims claims = Jwts.claims().setSubject(username);
+        claims.put("userId", userId);
         Date now = new Date();
         Date validity = new Date(now.getTime() + accessTokenValidity);
 

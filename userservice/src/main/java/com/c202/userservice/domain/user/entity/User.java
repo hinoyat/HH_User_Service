@@ -34,11 +34,11 @@ public class User {
     @Column(nullable = true)
     private String birthTime;
 
-    @Column(nullable = false)
-    private String pwQuestion;
-
-    @Column(nullable = false)
-    private String pwAnswer;
+//    @Column(nullable = false)
+//    private String pwQuestion;
+//
+//    @Column(nullable = false)
+//    private String pwAnswer;
     
     // CreatedAt, UpdatedAt 타임 스탬프 or String 회의
 }
