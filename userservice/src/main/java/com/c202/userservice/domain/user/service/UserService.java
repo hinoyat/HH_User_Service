@@ -3,10 +3,12 @@ package com.c202.userservice.domain.user.service;
 import com.c202.userservice.domain.user.entity.User;
 import com.c202.userservice.domain.user.model.request.LoginRequestDto;
 import com.c202.userservice.domain.user.model.request.SignupRequestDto;
+import com.c202.userservice.domain.user.model.request.UpdateUserRequestDto;
 import com.c202.userservice.domain.user.model.response.UserResponseDto;
 import com.c202.userservice.domain.user.repository.UserRepository;
 import com.c202.userservice.global.auth.CustomUserDetails;
 import com.c202.userservice.global.auth.JwtTokenProvider;
+import com.c202.userservice.global.exception.ServiceException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -14,6 +16,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
@@ -25,24 +30,32 @@ public class UserService {
     private final JwtTokenProvider jwtTokenProvider;
 
 
+    // 날짜 포매터
+    private final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
     @Transactional
     public UserResponseDto signUp(SignupRequestDto request) {
 
         // 중복 검사
-//        if (userRepository.existsByUsername(request.getUsername())) {}
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new ServiceException.UsernameAlreadyExistsException("이미 사용 중인 아이디입니다.");
+        }
 
-//        if (userRepository.existsByNickname(request.getUsername())) {}
+        if (userRepository.existsByNickname(request.getNickname())) {
+            throw new ServiceException.UsernameAlreadyExistsException("이미 사용 중인 닉네임 입니다");
+        }
+
+        String now = LocalDateTime.now().format(DATE_TIME_FORMATTER);
 
         User user = User.builder()
                 .username(request.getUsername())
-                // 나중에
                 .password(passwordEncoder.encode(request.getPassword()))
-//                .password(request.getPassword())
                 .nickname(request.getNickname())
                 .birthDate(request.getBirthDate())
                 .birthTime(request.getBirthTime())
-//                .pwQuestion(request.getPwQuestion())
-//                .pwAnswer(request.getPwAnswer())
+                .createdAt(now)
+                .updatedAt(now)
+                .deleted("N")
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -59,8 +72,73 @@ public class UserService {
         // 인증된 사용자 정보 가져오기
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
+        // 삭제된 계정인지 확인
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new ServiceException.ResourceNotFoundException("사용자를 찾을 수 없습니다."));
+
+        if ("Y".equals(user.getDeleted())) {
+            throw new ServiceException.ResourceNotFoundException("탈퇴한 계정입니다.");
+        }
+
         // 토큰 생성 및 반환
         return jwtTokenProvider.createToken(userDetails.getUsername(), userDetails.getId());
+    }
+    // 사용자 정보 조회
+    public UserResponseDto getUserInfo(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ServiceException.ResourceNotFoundException("사용자를 찾을 수 없습니다."));
+        if ("Y".equals(user.getDeleted())) {
+            throw new ServiceException.ResourceNotFoundException("탈퇴한 계정입니다.");
+        }
+        return UserResponseDto.toDto(user);
+    }
+
+    // 사용자 정보 수정
+    @Transactional
+    public UserResponseDto updateUser(String username, UpdateUserRequestDto request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ServiceException.ResourceNotFoundException("사용자를 찾을 수 없습니다."));
+
+        if ("Y".equals(user.getDeleted())) {
+            throw new ServiceException.ResourceNotFoundException("탈퇴한 계정입니다.");
+        }
+
+        // 닉네임 변경 시 중복 체크
+        if (request.getNickname() != null && !request.getNickname().equals(user.getNickname())) {
+            if (userRepository.existsByNickname(request.getNickname())) {
+                throw new ServiceException.UsernameAlreadyExistsException("이미 사용 중인 닉네임입니다.");
+            }
+            user.updateNickname(request.getNickname());
+        }
+
+        // 비밀번호 변경
+        if (request.getPassword() != null) {
+            user.updatePassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        // 수정 시간 업데이트
+        String now = LocalDateTime.now().format(DATE_TIME_FORMATTER);
+        user.updateInfo(now);
+
+        return UserResponseDto.toDto(user);
+    }
+
+    // 회원 탈퇴
+    @Transactional
+    public void deleteUser(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ServiceException.ResourceNotFoundException("사용자를 찾을 수 없습니다."));
+
+        if ("Y".equals(user.getDeleted())) {
+            throw new ServiceException.ResourceNotFoundException("이미 탈퇴한 계정입니다.");
+        }
+
+        // 물리적 삭제가 아닌 논리적 삭제 처리
+        user.deleteUser();
+
+        // 수정 시간 업데이트
+        String now = LocalDateTime.now().format(DATE_TIME_FORMATTER);
+        user.updateInfo(now);
     }
 
     public boolean isUsernameAvailable(String username) {

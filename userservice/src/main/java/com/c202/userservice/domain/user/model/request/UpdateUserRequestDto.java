@@ -5,11 +5,8 @@ import lombok.Data;
 
 @Data
 @Builder
-public class SignupRequestDto {
+public class UpdateUserRequestDto {
 
-    private String username;
     private String password;
     private String nickname;
-    private String birthDate;
-    private String birthTime;
 }
