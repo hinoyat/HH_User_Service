@@ -8,6 +8,7 @@ import com.c202.userservice.domain.user.model.response.UserResponseDto;
 import com.c202.userservice.domain.user.repository.UserRepository;
 import com.c202.userservice.global.auth.CustomUserDetails;
 import com.c202.userservice.global.auth.JwtTokenProvider;
+import com.c202.userservice.global.auth.TokenDto;
 import com.c202.userservice.global.exception.ServiceException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -29,20 +31,18 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
 
-
-    // 날짜 포매터
-    private final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    // 날짜 포맷터
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     @Transactional
     public UserResponseDto signUp(SignupRequestDto request) {
-
         // 중복 검사
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new ServiceException.UsernameAlreadyExistsException("이미 사용 중인 아이디입니다.");
         }
 
         if (userRepository.existsByNickname(request.getNickname())) {
-            throw new ServiceException.UsernameAlreadyExistsException("이미 사용 중인 닉네임 입니다");
+            throw new ServiceException.UsernameAlreadyExistsException("이미 사용 중인 닉네임입니다.");
         }
 
         String now = LocalDateTime.now().format(DATE_TIME_FORMATTER);
@@ -63,7 +63,8 @@ public class UserService {
         return UserResponseDto.toDto(savedUser);
     }
 
-    public String login(LoginRequestDto request) {
+    // 로그인 메소드 수정 - 액세스 토큰과 리프레시 토큰 모두 발급
+    public TokenDto.TokenResponseDto login(LoginRequestDto request) {
         // Spring Security 인증 처리
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
@@ -80,8 +81,34 @@ public class UserService {
             throw new ServiceException.ResourceNotFoundException("탈퇴한 계정입니다.");
         }
 
-        // 토큰 생성 및 반환
-        return jwtTokenProvider.createToken(userDetails.getUsername(), userDetails.getId());
+        // 액세스 토큰과 리프레시 토큰 생성
+        String accessToken = jwtTokenProvider.createAccessToken(userDetails.getUsername(), userDetails.getId());
+        String refreshToken = jwtTokenProvider.createRefreshToken(userDetails.getUsername(), userDetails.getId());
+
+        // 토큰 응답 객체 생성 및 반환
+        return TokenDto.TokenResponseDto.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
+    // 토큰 갱신 메소드 추가
+    public TokenDto.TokenResponseDto refreshToken(TokenDto.RefreshTokenRequestDto requestDto) {
+        // 리프레시 토큰으로 새 액세스 토큰 발급
+        String newAccessToken = jwtTokenProvider.refreshAccessToken(requestDto.getRefreshToken());
+
+        // 토큰 응답 생성 및 반환 (액세스 토큰만 갱신)
+        return TokenDto.TokenResponseDto.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(requestDto.getRefreshToken())
+                .build();
+    }
+
+    // 로그아웃 메소드 추가
+    @Transactional
+    public void logout(Long userId) {
+        // JWT 토큰 제공자를 통해 리프레시 토큰 삭제
+        jwtTokenProvider.logout(userId);
     }
     // 사용자 정보 조회
     public UserResponseDto getUserInfo(String username) {
