@@ -30,12 +30,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF 보호 비활성화 (JWT 사용으로 불필요)
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        // CSRF 보호에서 일부 경로 제외 (API만 해당)
-                        .ignoringRequestMatchers("/api/users/login", "/api/users/signup", "/api/users/refresh"))
-
+//                .csrf(csrf -> csrf
+//                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+//                        // CSRF 보호에서 일부 경로 제외 (API만 해당)
+//                        .ignoringRequestMatchers("/api/users/login", "/api/users/signup", "/api/users/refresh"))
+                .csrf(csrf -> csrf.disable())
                 // 쿠키 설정
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -51,9 +50,11 @@ public class SecurityConfig {
                 // 엔드포인트 권한 설정
                 .authorizeHttpRequests(authorize -> authorize
                         // 공개 엔드포인트 설정
-                        .requestMatchers("/api/users/signup", "/api/users/login", "/api/users/check/**", "/api/users/refresh").permitAll()                        // 인증된 사용자만 접근 가능한 엔드포인트
+                        .requestMatchers("/api/users/signup", "/api/users/login", "/api/users/check/**", "/api/users/refresh").permitAll()
+                        // 로그아웃 엔드포인트 명시적 허용 (인증된 사용자만)
+                        .requestMatchers("/api/users/logout").authenticated()
+                        // 인증된 사용자만 접근 가능한 엔드포인트
                         .anyRequest().authenticated())
-
                 // JWT 필터 추가 (UsernamePasswordAuthenticationFilter 전에 실행)
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class);

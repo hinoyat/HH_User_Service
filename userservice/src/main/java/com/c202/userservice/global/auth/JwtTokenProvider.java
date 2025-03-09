@@ -1,5 +1,6 @@
 package com.c202.userservice.global.auth;
 
+import com.c202.userservice.global.auth.blacklist.AccessTokenBlacklistService;
 import com.c202.userservice.global.auth.refreshtoken.RefreshToken;
 import com.c202.userservice.global.auth.refreshtoken.RefreshTokenRepository;
 import com.c202.userservice.global.exception.ServiceException;
@@ -9,6 +10,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +55,9 @@ public class JwtTokenProvider {
 
     // 리프레시 토큰 저장소
     private final RefreshTokenRepository refreshTokenRepository;
+
+    // 토큰 블랙리스트
+    private final AccessTokenBlacklistService accessTokenBlacklistService;
 
     // 초기화 메소드 - 애플리케이션 시작 시 실행
     @PostConstruct
@@ -188,11 +193,36 @@ public class JwtTokenProvider {
     // 토큰 유효성 검증
     public boolean validateToken(String token) {
         try {
-            // 토큰 파싱 시도 - 유효하면 true 반환
+            // 블랙리스트
+            if (accessTokenBlacklistService.isBlacklisted(token)) {
+                log.warn("블랙리스트에 등록된 토큰입니다: {}", token);
+                return false;
+            }
+
+            // 토큰 파싱 시도
             Jws<Claims> claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
-            return !claims.getBody().getExpiration().before(new Date());
+
+            // 만료 확인
+            boolean isValid = !claims.getBody().getExpiration().before(new Date());
+            if (isValid) {
+                log.debug("유효한 토큰: {}, 사용자: {}", token.substring(0, 10), claims.getBody().getSubject());
+            } else {
+                log.warn("만료된 토큰: {}", token.substring(0, 10));
+            }
+            return isValid;
+        } catch (ExpiredJwtException e) {
+            log.warn("만료된 JWT 토큰: {}", e.getMessage());
+            return false;
+        } catch (UnsupportedJwtException e) {
+            log.error("지원되지 않는 JWT 토큰: {}", e.getMessage());
+            return false;
+        } catch (MalformedJwtException e) {
+            log.error("잘못된 형식의 JWT 토큰: {}", e.getMessage());
+            return false;
+        } catch (SignatureException e) {
+            log.error("유효하지 않은 JWT 서명: {}", e.getMessage());
+            return false;
         } catch (JwtException | IllegalArgumentException e) {
-            // 토큰 파싱 실패 시 로그 기록 및 false 반환
             log.error("잘못된 JWT 토큰: {}", e.getMessage());
             return false;
         }
@@ -225,8 +255,29 @@ public class JwtTokenProvider {
         return createAccessToken(username, userId);
     }
 
-    // 로그아웃 처리 - 리프레시 토큰 삭제
-    public void logout(Long userId) {
-        refreshTokenRepository.deleteByUserId(userId);
+    // 로그아웃 처리 블랙리스트
+    public void addToBlacklist(String accessToken) {
+        log.debug("토큰 블랙리스트 추가 시작");
+
+        try {
+            // 토큰 유효성 검사
+            if (accessToken == null || accessToken.isEmpty()) {
+                log.warn("블랙리스트에 추가할 토큰이 없습니다.");
+                return;
+            }
+
+            // 토큰에서 만료 시간 추출
+            Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(accessToken).getBody();
+            Date expiration = claims.getExpiration();
+
+            // 블랙리스트 서비스를 통해 블랙리스트에 추가
+            accessTokenBlacklistService.addToBlacklist(accessToken, expiration);
+            log.debug("액세스 토큰이 블랙리스트에 추가되었습니다. 만료 시간: {}", expiration);
+        } catch (ExpiredJwtException e) {
+            log.warn("이미 만료된 토큰이므로 블랙리스트에 추가하지 않습니다: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("액세스 토큰 블랙리스트 등록 실패: {}", e.getMessage(), e);
+            // 로그만 남기고 예외를 다시 던지지 않음
+        }
     }
 }

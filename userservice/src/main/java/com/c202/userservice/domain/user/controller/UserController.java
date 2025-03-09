@@ -33,7 +33,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(user, "회원가입 성공"));
     }
 
-    // 로그인 메소드 수정 - 리프레시 토큰을 쿠키에 설정
+    // 로그인
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Map<String, String>>> login(
             @RequestBody LoginRequestDto requestDto,
@@ -50,7 +50,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(tokenResponse, "로그인이 성공했습니다."));
     }
 
-    // 토큰 갱신 엔드포인트 추가
+    // 토큰 갱신
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<Map<String, String>>> refreshToken(
             HttpServletRequest request,
@@ -72,18 +72,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(tokenResponse, "토큰이 갱신되었습니다."));
     }
 
-    // 로그아웃 엔드포인트 추가
+    // 로그아웃
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            HttpServletRequest request,
-            HttpServletResponse response,
-            @RequestHeader("Authorization") String authHeader) {
+            HttpServletResponse response) {
 
-        // Bearer 토큰에서 실제 토큰 추출
-        String accessToken = authHeader.substring(7);
-
-        // 로그아웃 처리 (리프레시 토큰 DB에서 삭제)
+        // 로그아웃 처리 - 서비스에서 토큰 추출하지 않고 userId만 사용
         userService.logout(userDetails.getId());
 
         // 리프레시 토큰 쿠키 삭제

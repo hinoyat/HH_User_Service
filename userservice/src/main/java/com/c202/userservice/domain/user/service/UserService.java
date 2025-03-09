@@ -9,8 +9,10 @@ import com.c202.userservice.domain.user.repository.UserRepository;
 import com.c202.userservice.global.auth.CustomUserDetails;
 import com.c202.userservice.global.auth.JwtTokenProvider;
 import com.c202.userservice.global.auth.TokenDto;
+import com.c202.userservice.global.auth.refreshtoken.RefreshTokenRepository;
 import com.c202.userservice.global.exception.ServiceException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -24,12 +26,14 @@ import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // 날짜 포맷터
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
@@ -104,12 +108,21 @@ public class UserService {
                 .build();
     }
 
-    // 로그아웃 메소드 추가
+    // 로그아웃
     @Transactional
     public void logout(Long userId) {
-        // JWT 토큰 제공자를 통해 리프레시 토큰 삭제
-        jwtTokenProvider.logout(userId);
+        log.debug("사용자 ID={}의 로그아웃 처리 시작", userId);
+
+        try {
+            // 1. 리프레시 토큰 제거
+            refreshTokenRepository.deleteByUserId(userId);
+            log.debug("리프레시 토큰 삭제 완료: 사용자 ID={}", userId);
+        } catch (Exception e) {
+            log.error("로그아웃 처리 중 오류 발생: {}", e.getMessage(), e);
+            // 로그아웃 처리는 최대한 성공시키도록 예외를 던지지 않음
+        }
     }
+
     // 사용자 정보 조회
     public UserResponseDto getUserInfo(String username) {
         User user = userRepository.findByUsername(username)
