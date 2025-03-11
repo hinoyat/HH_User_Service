@@ -193,11 +193,11 @@ public class JwtTokenProvider {
     // 토큰 유효성 검증
     public boolean validateToken(String token) {
         try {
-            // 블랙리스트
-            if (accessTokenBlacklistService.isBlacklisted(token)) {
-                log.warn("블랙리스트에 등록된 토큰입니다: {}", token);
-                return false;
-            }
+//            // 블랙리스트
+//            if (accessTokenBlacklistService.isBlacklisted(token)) {
+//                log.warn("블랙리스트에 등록된 토큰입니다: {}", token);
+//                return false;
+//            }
 
             // 토큰 파싱 시도
             Jws<Claims> claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
