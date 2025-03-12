@@ -4,22 +4,22 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/security?useSSL=false&useUnicode=true&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/user_db?useSSL=false&useUnicode=true&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
     username: root
     password: 1234
 
   jpa:
     hibernate:
       ddl-auto: update
-#      ddl-auto: none
+      #      ddl-auto: none
       naming:
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-#  data:
-#    redis:
-#      host: localhost
-#      port: 6379
-#      # password: yourpassword  # 필요한 경우
-#      timeout: 60000
+  #  data:
+  #    redis:
+  #      host: localhost
+  #      port: 6379
+  #      # password: yourpassword  # ??? ??
+  #      timeout: 60000
 
   logging:
     level:
